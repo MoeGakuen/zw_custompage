@@ -40,7 +40,9 @@ function zw_custompage_show_set(result){
 	});}
 	$('#page_footer_js').val(result.setting.page_footer_js);
 	$('#page_footer_text').val(result.setting.page_footer_text);
-	$('#bg_images').val(result.setting.bg_images);
+    	$('#bg_img').val(result.setting.bg_img);
+	$('#min_bg').val(result.setting.min_bg);
+	$('#max_bg').val(result.setting.max_bg);
 	if(result.setting.page_switch=='0'){$('#page_switch').removeAttr('checked');}
 	if(result.setting.footer_text_switch=='0'){$('#footer_text_switch').removeAttr('checked');}
 	if(result.setting.footer_js_switch=='0'){$('#footer_js_switch').removeAttr('checked');}

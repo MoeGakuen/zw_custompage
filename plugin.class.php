@@ -4,7 +4,7 @@ if (!defined('IN_KKFRAME')) exit('Access Denied!');
 class plugin_zw_custompage extends Plugin {
 	var $description = '本插件可以在前台添加页面、页底代码和修改背景。';
 	var $modules = array();
-	var $version = '1.2.2.1';
+	var $version = '1.2.3';
 	private $setting;
 	private $background;
 
@@ -22,7 +22,9 @@ PRIMARY KEY (`id`)
 					'bg_switch' => 0,
 					'page_footer_js' => '',
 					'page_footer_text' => '',
-					'bg_images' => '',
+					'bg_img' => '',
+					'min_bg' => '',
+					'max_bg' => '',
 					)));
 	} 
 
@@ -44,8 +46,8 @@ DELETE FROM `plugin_var` WHERE `pluginid`='zw_custompage';
 	function getMethods() {
 		$this -> setting = json_decode($this -> getSetting('setting'), true);
 		if ($this -> setting['bg_switch'] == 1) {
-			$bgimages = array_filter(explode("\n", trim ($this -> setting['bg_images'])));
-			$this -> background = trim($bgimages[rand(0, count($bgimages)-1)]);
+			$this -> image = trim ($this -> setting['bg_img']);
+			$this -> background = rand((int)trim ($this -> setting['min_bg']), (int)trim ($this -> setting['max_bg']));
 		} 
 		$query = DB :: query ("SELECT * FROM zw_custompage_pages WHERE pswitch=1");
 		while ($result = DB :: fetch ($query)) {
@@ -69,37 +71,14 @@ DELETE FROM `plugin_var` WHERE `pluginid`='zw_custompage';
 		return $modules;
 	} 
 
-	function on_upgrade($nowversion) {
-		switch ($nowversion) {
-			case '1.1.0':
-				runquery("ALTER TABLE  `zw_custompage_setting` CHANGE  `footer_switch`  `footer_js_switch` TINYINT( 1 ) UNSIGNED NOT NULL DEFAULT  '1';
-ALTER TABLE  `zw_custompage_setting` ADD  `footer_text_switch` TINYINT( 1 ) NOT NULL AFTER  `footer_js_switch`;
-ALTER TABLE  `zw_custompage_setting` CHANGE  `page_footer`  `page_footer_js` TEXT CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL;
-ALTER TABLE  `zw_custompage_setting` ADD  `page_footer_text` TEXT NULL AFTER  `page_footer_js`;");
-				return '1.1.1';
-			case '1.1.1':
-				$setting = DB :: fetch_first("SELECT * FROM `zw_custompage_setting` WHERE 1");
-				$this -> saveSetting('setting', json_encode(array('page_switch' => $setting['page_switch'],
-							'footer_js_switch' => $setting['footer_js_switch'],
-							'footer_text_switch' => $setting['footer_text_switch'],
-							'bg_switch' => $setting['bg_switch'],
-							'page_footer_js' => $setting['page_footer_js'],
-							'page_footer_text' => $setting['page_footer_text'],
-							'bg_images' => $setting['bg_images'],
-							)));
-				runquery("DROP TABLE `zw_custompage_setting`;
-DELETE FROM `setting` WHERE `k` LIKE 'zw_custompage%';
-");
-				return '1.2.0';
-		} 
-	} 
-
 	function page_footer_js() {
 		global $uid;
 		if (is_admin($uid)) echo '<script src="plugins/zw_custompage/zw_custompage.js"></script>';
 		if ($this -> setting['footer_js_switch'] == 1) echo $this -> setting['page_footer_js'];
 		if ($this -> setting['bg_switch'] == 1) {
-			echo "<script type='text/javascript'>$('#page_index').css({'background':'url({$this -> background})','background-size':'100% 100%','background-attachment':'fixed','color':'#e5e5e5'});</script>";
+			if (!is_mobile_request()) {
+				echo "<script type='text/javascript'>$('#page_index').css({'background':'url({$this -> image}{$this -> background}.jpg)','background-size':'100% 100%','background-attachment':'fixed','color':'#e5e5e5'});</script>";
+			}
 		} 
 	} 
 
@@ -110,7 +89,9 @@ DELETE FROM `setting` WHERE `k` LIKE 'zw_custompage%';
 	function member_footer() {
 		if ($this -> setting['footer_switch'] == 1) echo $this -> setting['page_footer_js'];
 		if ($this -> setting['bg_switch'] == 1) {
-			echo "<script src='" . jquery_path() . "'></script><script type='text/javascript'>$('#page_login').css({'background':'url({$this -> background}) no-repeat 50% 50%','background-size':'100% 100%'});</script>";
+			if (!is_mobile_request()) {
+				echo "<script src='" . jquery_path() . "'></script><script type='text/javascript'>$('#page_login').css({'background':'url({$this -> image}{$this -> background}.jpg) no-repeat 50% 50%','background-size':'100% 100%'});</script>";
+			} else {echo "<script src='" . jquery_path() . "'></script>";}
 		} 
 	} 
 
@@ -130,7 +111,7 @@ DELETE FROM `setting` WHERE `k` LIKE 'zw_custompage%';
 				} 
 				$data ['count'] = count($data ['pages']);
 				$setting = json_decode($this -> getSetting('setting'), true);
-				$data ['setting'] = $setting ? $setting : array("page_switch" => 1, "footer_js_switch" => 1, "footer_text_switch" => 1, "bg_switch" => 0, "page_footer_js" => "", "page_footer_text" => "", "bg_images" => ""
+				$data ['setting'] = $setting ? $setting : array("page_switch" => 1, "footer_js_switch" => 1, "footer_text_switch" => 1, "bg_switch" => 0, "page_footer_js" => "", "page_footer_text" => "", "bg_img" => "", "min_bg" => "", "max_bg" => ""
 					);
 				break;
 			case 'savesetting':
@@ -139,8 +120,10 @@ DELETE FROM `setting` WHERE `k` LIKE 'zw_custompage%';
 							'footer_text_switch' => $_POST['footer_text_switch'] == 1?1:0,
 							'bg_switch' => $_POST['bg_switch'] == 1?1:0,
 							'page_footer_js' => trim($_POST['page_footer_js']),
-							'bg_images' => trim($_POST['bg_images']),
 							'page_footer_text' => trim($_POST['page_footer_text']),
+							'bg_img' => trim($_POST['bg_img']),
+							'min_bg' => trim($_POST['min_bg']),
+							'max_bg' => trim($_POST['max_bg']),
 							)));
 				$data['msg'] = '保存成功！';
 				break;
@@ -185,3 +168,45 @@ DELETE FROM `setting` WHERE `k` LIKE 'zw_custompage%';
 		echo json_encode ($data);
 	} 
 } 
+
+
+
+function is_mobile_request()  
+{  
+ $_SERVER['ALL_HTTP'] = isset($_SERVER['ALL_HTTP']) ? $_SERVER['ALL_HTTP'] : '';  
+ $mobile_browser = '0';  
+ if(preg_match('/(up.browser|up.link|mmp|symbian|smartphone|midp|wap|phone|iphone|ipad|ipod|android|xoom)/i', strtolower($_SERVER['HTTP_USER_AGENT'])))  
+  $mobile_browser++;  
+ if((isset($_SERVER['HTTP_ACCEPT'])) and (strpos(strtolower($_SERVER['HTTP_ACCEPT']),'application/vnd.wap.xhtml+xml') !== false))  
+  $mobile_browser++;  
+ if(isset($_SERVER['HTTP_X_WAP_PROFILE']))  
+  $mobile_browser++;  
+ if(isset($_SERVER['HTTP_PROFILE']))  
+  $mobile_browser++;  
+ $mobile_ua = strtolower(substr($_SERVER['HTTP_USER_AGENT'],0,4));  
+ $mobile_agents = array(  
+    'w3c ','acs-','alav','alca','amoi','audi','avan','benq','bird','blac',  
+    'blaz','brew','cell','cldc','cmd-','dang','doco','eric','hipt','inno',  
+    'ipaq','java','jigs','kddi','keji','leno','lg-c','lg-d','lg-g','lge-',  
+    'maui','maxo','midp','mits','mmef','mobi','mot-','moto','mwbp','nec-',  
+    'newt','noki','oper','palm','pana','pant','phil','play','port','prox',  
+    'qwap','sage','sams','sany','sch-','sec-','send','seri','sgh-','shar',  
+    'sie-','siem','smal','smar','sony','sph-','symb','t-mo','teli','tim-',  
+    'tosh','tsm-','upg1','upsi','vk-v','voda','wap-','wapa','wapi','wapp',  
+    'wapr','webc','winw','winw','xda','xda-'
+    );  
+ if(in_array($mobile_ua, $mobile_agents))  
+  $mobile_browser++;  
+ if(strpos(strtolower($_SERVER['ALL_HTTP']), 'operamini') !== false)  
+  $mobile_browser++;  
+ // Pre-final check to reset everything if the user is on Windows  
+ if(strpos(strtolower($_SERVER['HTTP_USER_AGENT']), 'windows') !== false)  
+  $mobile_browser=0;  
+ // But WP7 is also Windows, with a slightly different characteristic  
+ if(strpos(strtolower($_SERVER['HTTP_USER_AGENT']), 'windows phone') !== false)  
+  $mobile_browser++;  
+ if($mobile_browser>0)  
+  return true;  
+ else
+  return false;
+}
